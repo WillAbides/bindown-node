@@ -1,0 +1,31 @@
+name: publish
+on:
+  release:
+    types:
+      - published
+jobs:
+  publish:
+    env:
+      RELEASE_BRANCH: main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          registry-url: https://npm.pkg.github.com/
+      - run: npm ci
+      - id: branch-check
+        run: |
+          if git merge-base --is-ancestor origin/"${RELEASE_BRANCH}" HEAD; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - run: npm publish
+        if: ${{ steps.branch-check.outputs.ok == 'true' }}
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
