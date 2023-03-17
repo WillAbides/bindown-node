@@ -1,6 +1,6 @@
 {
   "name": "@willabides/bindown",
-  "version": "0.0.0-development",
+  "version": "0.0.0",
   "license": "MIT",
   "engines": {
     "node": ">=12"
