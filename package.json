@@ -11,7 +11,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "install-bindown": "dist/bin/install-bindown.js"
+    "install-bindown": "dist/install-bindown.js"
   },
   "scripts": {
     "build": "tsc",
