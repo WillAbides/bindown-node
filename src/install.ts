@@ -1,9 +1,8 @@
 import {dirname, join, parse} from 'path';
-import * as https from 'https';
 import get from 'axios';
-import {IncomingMessage} from 'http';
 import {copyFileSync, createWriteStream, existsSync, mkdirSync} from 'fs';
 import decompress from 'decompress';
+import followRedirects from 'follow-redirects';
 
 const RELEASES_URL = 'https://github.com/WillAbides/bindown/releases';
 
@@ -23,37 +22,15 @@ export function defaultCacheDir(): string {
   return join(findNodeModules(), '.cache', 'bindown-node');
 }
 
-// resolveURLRedirects recursively follows redirects until it finds a non-redirect url.
-async function resolveHttpsRedirects(url: string, maxRedirects: number): Promise<string> {
-  if (maxRedirects < 0) {
-    throw new Error(`too many redirects: ${url}`);
-  }
-  maxRedirects -= 1;
-  const msg = await new Promise<IncomingMessage>((resolve, reject) => {
-    https.request(url, {
-      method: 'HEAD',
-      timeout: 60_000,
-    }, (res: IncomingMessage) => {
-      resolve(res);
-    }).on('error', reject).end();
-  });
-  const redirectCodes = [301, 302, 303, 307, 308];
-  if (!redirectCodes.includes(msg.statusCode || 0)) {
-    return url;
-  }
-  const location = msg.headers.location;
-  if (!location) {
-    throw new Error(`redirect without location header: ${url}`);
-  }
-  return resolveHttpsRedirects(location, maxRedirects);
-}
-
 // latestRelease gets the latest release of bindown from GitHub.
 export async function latestRelease(): Promise<string> {
   const url = `${RELEASES_URL}/latest`;
-  const resolved = await resolveHttpsRedirects(url, 10);
-  const parts = resolved.split('/');
-  return parts[parts.length - 1];
+  return new Promise<string>((resolve, reject) => {
+    followRedirects.https.get(url, (res) => {
+      const parts = res.responseUrl.split('/');
+      resolve(parts[parts.length - 1]);
+    }).on('error', reject);
+  });
 }
 
 
