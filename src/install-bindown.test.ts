@@ -1,5 +1,5 @@
 import {strictEqual} from 'assert';
-import {delimiter, join, resolve} from 'path';
+import {delimiter, join, resolve, basename} from 'path';
 import {execSync} from 'child_process';
 import {existsSync, mkdirSync, rmSync, writeFileSync} from 'fs';
 
@@ -38,7 +38,8 @@ describe('install-bindown', function () {
     }).trim();
 
     const resp = execSync(`${bindownBin} version`, {encoding: 'utf8'}).trim();
-    strictEqual(resp, 'bindown: version 3.12.0');
+    const bindownBinName = basename(bindownBin);
+    strictEqual(resp, `${bindownBinName}: version 3.12.0`);
 
     rmSync(tempDir, {recursive: true});
   });
