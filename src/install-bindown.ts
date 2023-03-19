@@ -1,67 +1,73 @@
 #!/usr/bin/env node
 
 import yargs from 'yargs';
-import {defaultCacheDir, installBindown} from './install';
+import {defaultCacheDir, Bindown} from './install';
 
 const description =
-  'install-bindown will download bindown and optionally copy the binary to a target path. Outputs the path to the bindown binary';
+  'install-bindown will download and extract the bindown binary for the given version, platform, and architecture.';
 
-async function main() {
-  yargs(process.argv.slice(2))
-    .command({
-      command: '$0 <bindown-version> [args]',
-      describe: description,
-      builder: (y) => y
-        .positional('bindown-version', {
-          description: 'the version of bindown to install',
-        })
-        .option('target', {
-          description: 'the path to install bindown to',
-        })
-        .option('platform', {
-          description: 'the platform to install bindown for',
-          default: process.platform.toString(),
-        })
-        .option('arch', {
-          description: 'the architecture to install bindown for',
-          default: process.arch.toString(),
-        })
-        .option('cache-dir', {
-          description: 'the directory where cache files will be stored',
-          default: defaultCacheDir(),
-        })
-        .option('force', {
-          description: 'forces a download even if it is already cached',
-        })
-        .option('debug', {
-          description: 'enable stack traces on errors',
-        }),
-      handler: async (argv) => {
-        if (!argv.debug) {
-          Error.stackTraceLimit = 0;
-        }
-        const output = await installBindown(argv['bindown-version'], {
-          target: argv.target,
-          platform: argv.platform,
-          arch: argv.arch,
-          cacheDir: argv.cacheDir,
-          force: argv.force,
-          debug: argv.debug,
-        })
-        console.log(output);
-      }
-    })
-    .demandCommand()
-    .help()
-    .alias('h', 'help')
-    .version()
-    .alias('v', 'version')
-    .wrap(Math.min(120, yargs.terminalWidth()))
-    .strict()
-    .argv;
+yargs(process.argv.slice(2))
+  .command({
+    command: '$0 <bindown-version> [args]',
+    describe: description,
+    builder: (y) => y
+      .positional('bindown-version', {
+        description: 'the version of bindown to install',
+      })
+      .option('platform', {
+        description: 'the platform to install bindown for',
+        default: process.platform.toString(),
+      })
+      .option('goos', {
+        description: 'the GOOS to install bindown for. This overrides platform',
+      })
+      .option('arch', {
+        description: 'the architecture to install bindown for',
+        default: process.arch.toString(),
+      })
+      .option('goarch', {
+        description: 'the GOARCH to install bindown for. This overrides arch',
+      })
+      .option('cache-dir', {
+        description: 'the directory where cache files will be stored',
+        default: defaultCacheDir(),
+      })
+      .option('force', {
+        description: 'forces a download even if it is already cached',
+      })
+      .option('debug', {
+        description: 'enable stack traces on errors',
+      }),
+    handler: run
+  })
+  .demandCommand()
+  .help()
+  .alias('h', 'help')
+  .version()
+  .alias('v', 'version')
+  .wrap(Math.min(120, yargs.terminalWidth()))
+  .strict()
+  .parse();
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function run(argv: any) {
+  const bindown = new Bindown({
+    version: argv.bindownVersion,
+    platform: argv.platform,
+    arch: argv.arch,
+    goos: argv.goos,
+    goarch: argv.goarch,
+    cacheDir: argv.cacheDir,
+    force: argv.force,
+  });
+  bindown.installBindown({
+    force: argv.force,
+  }).then((bin) => {
+    console.log(bin);
+  }).catch((err) => {
+    if (argv.debug) {
+      throw err;
+    }
+    console.error(err.message);
+  });
 }
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
