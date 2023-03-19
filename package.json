@@ -45,8 +45,7 @@
   "homepage": "https://github.com/willabides/bindown-node",
   "release": {
     "branches": [
-      "main",
-      "semantic-release"
+      "main"
     ]
   }
 }
