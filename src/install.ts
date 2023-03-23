@@ -1,6 +1,6 @@
 import {dirname, join, parse} from 'path';
 import get from 'axios';
-import {copyFileSync, createWriteStream, existsSync, mkdirSync} from 'fs';
+import {copyFileSync, createWriteStream, existsSync, mkdirSync, rmSync} from 'fs';
 import decompress from 'decompress';
 import followRedirects from 'follow-redirects';
 
@@ -32,7 +32,6 @@ export async function latestRelease(): Promise<string> {
     }).on('error', reject);
   });
 }
-
 
 const platformToGoos: { [key: string]: string } = {
   android: 'android',
@@ -88,25 +87,10 @@ async function download(url: string, target: string) {
   });
 }
 
-interface Options {
-  // If defined, the bindown binary will be copied to this path. Absolute paths are recommended.
-  target?: string;
-  // The platform (os) to install bindown for. Defaults to process.platform.toString()
-  platform?: string;
-  // The architecture to install bindown for. Defaults to process.arch.toString()
-  arch?: string;
-  // The directory where cache files will be stored. Defaults to node_modules/.cache/bindown
-  cacheDir?: string;
-  // Forces a download even if it is already cached.
-  force?: boolean;
-  // No friendly errors. Just throw.
-  debug?: boolean;
-}
-
 // installBindown installs bindown and returns the path to the bindown binary.
 // version is the version of bindown to install. Must be a release found at
 // https://github.com/WillAbides/bindown/releases. Remember they all start with "v".
-export async function installBindown(version: string, options: Options = {}): Promise<string> {
+export async function installBindown(version: string, options: InstallOptions = {}): Promise<string> {
   const cacheDir = options.cacheDir ?? defaultCacheDir();
   const goos = getGoos(options.platform);
   const goarch = getGoarch(options.arch);
@@ -139,4 +123,100 @@ export async function installBindown(version: string, options: Options = {}): Pr
   mkdirSync(targetDir, {recursive: true});
   copyFileSync(cachedBin, target);
   return target;
+}
+
+export const DEFAULT_BINDOWN_VERSION = 'v3.12.0';
+
+interface InstallOptions {
+  // If defined, the bindown binary will be copied to this path. Absolute paths are recommended.
+  target?: string;
+  // The platform (os) to install bindown for. Defaults to process.platform.toString()
+  platform?: string;
+  // The architecture to install bindown for. Defaults to process.arch.toString()
+  arch?: string;
+  // The directory where cache files will be stored. Defaults to node_modules/.cache/bindown
+  cacheDir?: string;
+  // Forces a download even if it is already cached.
+  force?: boolean;
+  // No friendly errors. Just throw.
+  debug?: boolean;
+}
+
+export interface BindownOptions {
+  // The version of bindown to use. Defaults to DEFAULT_BINDOWN_VERSION. Must be a release found at
+  // https://github.com/WillAbides/bindown/releases. Remember they all start with "v".
+  version?: string;
+  // The platform (os) to install bindown for. Defaults to process.platform.toString()
+  platform?: string;
+  // The GOOS to install bindown for. This overrides platform.
+  goos?: string;
+  // The architecture to install bindown for. Defaults to process.arch.toString()
+  arch?: string;
+  // The GOARCH to install bindown for. This overrides arch.
+  goarch?: string;
+  // The directory where cache files will be stored. Defaults to node_modules/.cache/bindown
+  cacheDir?: string;
+  // Forces a download even if it is already cached.
+  force?: boolean;
+}
+
+export class Bindown {
+  readonly version: string;
+  readonly cacheDir: string;
+  readonly goos: string;
+  readonly goarch: string;
+  readonly bindownBin: string;
+  private readonly fullCacheDir: string;
+  private readonly downloadUrl: string;
+  private readonly tarPath: string;
+
+  constructor(options: BindownOptions = {}) {
+    this.version = options.version ?? DEFAULT_BINDOWN_VERSION;
+    this.cacheDir = options.cacheDir ?? defaultCacheDir();
+    this.goos = options.goos ?? getGoos(options.platform);
+    this.goarch = options.goarch ?? getGoarch(options.arch);
+    this.fullCacheDir = join(this.cacheDir, this.version, this.goos, this.goarch);
+    const rawVersion = this.version.replace(/^v/, '');
+    const tarName = `bindown_${rawVersion}_${this.goos}_${this.goarch}.tar.gz`;
+    this.downloadUrl = `${RELEASES_URL}/download/${this.version}/${tarName}`;
+    this.tarPath = join(this.fullCacheDir, tarName);
+    this.bindownBin = join(this.fullCacheDir, this.goos === 'windows' ? 'bindown.exe' : 'bindown');
+  }
+
+  // installBindown installs bindown and returns the path to the bindown binary.
+  async installBindown(opts: { force?: boolean } = {}): Promise<string> {
+    const force = opts.force ?? false;
+    mkdirSync(this.fullCacheDir, {recursive: true})
+    if (force || !existsSync(this.tarPath)) {
+      try {
+        await download(this.downloadUrl, this.tarPath);
+      } catch (err) {
+        try {
+          rmSync(this.tarPath);
+        } catch (e) {
+          // ignore
+        }
+        throw new TraceableError(`failed to download ${this.downloadUrl}: ${err.message}`, err)
+      }
+    }
+    if (force || !existsSync(this.bindownBin)) {
+      try {
+        await decompress(this.tarPath, this.fullCacheDir);
+      } catch (err) {
+        try {
+          rmSync(this.bindownBin);
+        } catch (e) {
+          // ignore
+        }
+        throw new TraceableError(`failed to decompress ${this.tarPath}: ${err.message}`, err)
+      }
+    }
+    return this.bindownBin;
+  }
+}
+
+class TraceableError extends Error {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+  }
 }

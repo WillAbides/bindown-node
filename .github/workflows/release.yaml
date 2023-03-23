@@ -21,5 +21,3 @@ jobs:
         run: npx semantic-release
     permissions:
       contents: write
-      pull-requests: write
-      issues: write
