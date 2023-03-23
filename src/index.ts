@@ -1,1 +1,1 @@
-export {latestRelease, installBindown} from './install';
+export {latestRelease, Bindown} from './install';
