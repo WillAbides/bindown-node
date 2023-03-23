@@ -28,7 +28,12 @@ describe('Bindown.installBindown', () => {
   it('invalid version', async () => {
     const cacheDir = path.join(testDir, 'invalid-version');
     fs.rmSync(cacheDir, {recursive: true, force: true});
-    const bindown = new Bindown({cacheDir, version: 'v3.2.1'});
+    const bindown = new Bindown({
+      cacheDir,
+      version: 'v3.2.1',
+      platform: 'linux',
+      goarch: '386'
+    });
     let gotError: Error | undefined;
     try {
       await bindown.installBindown({force: true});
@@ -36,7 +41,7 @@ describe('Bindown.installBindown', () => {
       gotError = err;
     }
     assert.ok(gotError);
-    const wantMessage = 'failed to download https://github.com/WillAbides/bindown/releases/download/v3.2.1/bindown_3.2.1_darwin_arm64.tar.gz: unexpected status code: 404';
+    const wantMessage = 'failed to download https://github.com/WillAbides/bindown/releases/download/v3.2.1/bindown_3.2.1_linux_386.tar.gz: unexpected status code: 404';
     assert.strictEqual(gotError.message, wantMessage);
     const foundFiles = fs.readdirSync(cacheDir, {withFileTypes: true}).filter(dirent => dirent.isFile());
     assert.strictEqual(foundFiles.length, 0);
